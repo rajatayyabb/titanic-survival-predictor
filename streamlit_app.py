@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import os
 
 # Page configuration
 st.set_page_config(
@@ -10,28 +11,54 @@ st.set_page_config(
     layout="wide"
 )
 
+# Debug: Show current directory and files
+def check_files():
+    current_dir = os.getcwd()
+    files = os.listdir(current_dir)
+    return current_dir, files
+
 # Load the model
 @st.cache_resource
 def load_model():
-    with open('random_forest_model.pkl', 'rb') as f:
-        model = pickle.load(f)
-    with open('feature_names.pkl', 'rb') as f:
-        features = pickle.load(f)
-    return model, features
+    try:
+        # Check if files exist
+        if not os.path.exists('random_forest_model.pkl'):
+            st.error(f"❌ File 'random_forest_model.pkl' not found!")
+            st.info(f"Current directory: {os.getcwd()}")
+            st.info(f"Files in directory: {os.listdir('.')}")
+            return None, None
+        
+        if not os.path.exists('feature_names.pkl'):
+            st.error(f"❌ File 'feature_names.pkl' not found!")
+            return None, None
+            
+        with open('random_forest_model.pkl', 'rb') as f:
+            model = pickle.load(f)
+        with open('feature_names.pkl', 'rb') as f:
+            features = pickle.load(f)
+        return model, features
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        return None, None
 
-try:
-    model, feature_names = load_model()
-    model_loaded = True
-except:
-    model_loaded = False
+model, feature_names = load_model()
 
 # Title and Description
 st.title("🚢 Titanic Survival Prediction")
 st.markdown("### Predict survival on the Titanic using Random Forest Classifier")
 st.markdown("---")
 
-if not model_loaded:
+if model is None or feature_names is None:
     st.error("⚠️ Model files not found! Please ensure 'random_forest_model.pkl' and 'feature_names.pkl' are in the same directory.")
+    
+    # Show debug info
+    with st.expander("🔍 Debug Information"):
+        current_dir, files = check_files()
+        st.write(f"**Current Directory:** `{current_dir}`")
+        st.write(f"**Files Found:** {files}")
+        st.write("**Expected Files:**")
+        st.write("- random_forest_model.pkl")
+        st.write("- feature_names.pkl")
     st.stop()
 
 # Sidebar for input
@@ -83,27 +110,30 @@ st.markdown("---")
 
 # Prediction
 if st.button("🔮 Predict Survival", type="primary", use_container_width=True):
-    prediction = model.predict(input_data)[0]
-    probability = model.predict_proba(input_data)[0]
-    
-    st.subheader("🎯 Prediction Result")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if prediction == 1:
-            st.success("### ✅ SURVIVED")
-            st.balloons()
-        else:
-            st.error("### ❌ NOT SURVIVED")
-    
-    with col2:
-        st.info(f"**Survival Probability:** {probability[1]*100:.2f}%")
-        st.info(f"**Death Probability:** {probability[0]*100:.2f}%")
-    
-    # Progress bar for probability
-    st.markdown("#### Confidence Level")
-    st.progress(probability[1])
+    try:
+        prediction = model.predict(input_data)[0]
+        probability = model.predict_proba(input_data)[0]
+        
+        st.subheader("🎯 Prediction Result")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if prediction == 1:
+                st.success("### ✅ SURVIVED")
+                st.balloons()
+            else:
+                st.error("### ❌ NOT SURVIVED")
+        
+        with col2:
+            st.info(f"**Survival Probability:** {probability[1]*100:.2f}%")
+            st.info(f"**Death Probability:** {probability[0]*100:.2f}%")
+        
+        # Progress bar for probability
+        st.markdown("#### Confidence Level")
+        st.progress(float(probability[1]))
+    except Exception as e:
+        st.error(f"Prediction error: {str(e)}")
 
 # Additional Information
 st.markdown("---")
